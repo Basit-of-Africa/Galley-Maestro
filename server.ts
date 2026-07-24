@@ -1,15 +1,11 @@
 import express from 'express';
 import multer from 'multer';
 import path from 'path';
-import { fileURLToPath } from 'url';
 import { createServer as createViteServer } from 'vite';
 import { processDocxToPdf } from './server/docxProcessor.js';
 import { processPdfOverlay } from './server/pdfProcessor.js';
 import { createSampleDocxBuffer, createSamplePdfBuffer } from './server/sampleGenerator.js';
 import { GalleyMetadata, GalleyResponse } from './src/types.js';
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
 
 async function startServer() {
   const app = express();

@@ -5,6 +5,7 @@ import { Header } from './components/Header.js';
 import { MetadataForm } from './components/MetadataForm.js';
 import { PdfViewerPane } from './components/PdfViewerPane.js';
 import { BatchResultPane } from './components/BatchResultPane.js';
+import { MetricsDashboard, TypesettingMetrics } from './components/MetricsDashboard.js';
 import { ErrorAlert } from './components/ErrorAlert.js';
 import { GalleyResponse, GalleyMetadata, BulkBatchItem, BulkBatchResult } from './types.js';
 import { ShieldCheck, Sparkles, Files, Layers } from 'lucide-react';
@@ -16,11 +17,30 @@ export default function App() {
   const [batchResult, setBatchResult] = useState<BulkBatchResult | null>(null);
   const [lastBatchMetadata, setLastBatchMetadata] = useState<GalleyMetadata | null>(null);
 
+  // Lightweight state tracker for typesetting performance metrics
+  const [metrics, setMetrics] = useState<TypesettingMetrics>({
+    totalProcessed: 0,
+    successfulCount: 0,
+    failedCount: 0,
+    totalTimeMs: 0,
+  });
+
+  const recordMetric = (success: boolean, durationMs: number) => {
+    setMetrics((prev) => ({
+      totalProcessed: prev.totalProcessed + 1,
+      successfulCount: prev.successfulCount + (success ? 1 : 0),
+      failedCount: prev.failedCount + (success ? 0 : 1),
+      totalTimeMs: prev.totalTimeMs + durationMs,
+    }));
+  };
+
   // Single manuscript submit handler
   const handleSingleSubmit = async (formData: FormData) => {
     setIsLoading(true);
     setErrorMessage(null);
     setBatchResult(null); // hide batch pane when running single
+
+    const startTime = Date.now();
 
     try {
       const response = await fetch('/api/generate-galley', {
@@ -35,6 +55,7 @@ export default function App() {
       }
 
       setSingleResult(data as GalleyResponse);
+      recordMetric(true, Date.now() - startTime);
 
       // Auto-trigger direct browser file download for single proof
       try {
@@ -57,6 +78,7 @@ export default function App() {
       }
     } catch (err: any) {
       console.error('Submission error:', err);
+      recordMetric(false, Date.now() - startTime);
       setErrorMessage(err.message || 'An unexpected error occurred during typesetting.');
     } finally {
       setIsLoading(false);
@@ -112,6 +134,8 @@ export default function App() {
       formData.append('addWatermark', baseMetadata.addWatermark ? 'true' : 'false');
       formData.append('twoColumn', baseMetadata.twoColumn ? 'true' : 'false');
 
+      const startTime = Date.now();
+
       try {
         const response = await fetch('/api/generate-galley', {
           method: 'POST',
@@ -127,11 +151,13 @@ export default function App() {
         currentBatch.items[i].status = 'completed';
         currentBatch.items[i].result = data as GalleyResponse;
         currentBatch.successCount += 1;
+        recordMetric(true, Date.now() - startTime);
       } catch (err: any) {
         console.error(`Error processing batch item ${item.name}:`, err);
         currentBatch.items[i].status = 'error';
         currentBatch.items[i].errorMessage = err.message || 'Processing failed';
         currentBatch.failedCount += 1;
+        recordMetric(false, Date.now() - startTime);
       }
 
       setBatchResult({ ...currentBatch });
@@ -222,6 +248,8 @@ export default function App() {
     formData.append('addWatermark', meta.addWatermark ? 'true' : 'false');
     formData.append('twoColumn', meta.twoColumn ? 'true' : 'false');
 
+    const startTime = Date.now();
+
     try {
       const response = await fetch('/api/generate-galley', {
         method: 'POST',
@@ -247,6 +275,8 @@ export default function App() {
         updatedBatch.failedCount = Math.max(0, updatedBatch.failedCount - 1);
         updatedBatch.successCount += 1;
       }
+
+      recordMetric(true, Date.now() - startTime);
 
       // Re-generate ZIP bundle
       if (updatedBatch.successCount > 0) {
@@ -286,6 +316,8 @@ export default function App() {
       if (!wasError) {
         updatedBatch.failedCount += 1;
       }
+
+      recordMetric(false, Date.now() - startTime);
 
       setBatchResult({ ...updatedBatch });
     }
@@ -329,6 +361,14 @@ export default function App() {
 
           <div className="absolute -right-12 -bottom-12 w-64 h-64 bg-indigo-600/10 rounded-full blur-3xl pointer-events-none" />
         </div>
+
+        {/* Typesetting Performance Metrics Dashboard */}
+        <MetricsDashboard
+          metrics={metrics}
+          onResetMetrics={() =>
+            setMetrics({ totalProcessed: 0, successfulCount: 0, failedCount: 0, totalTimeMs: 0 })
+          }
+        />
 
         {/* Global Error Banner */}
         {errorMessage && (
