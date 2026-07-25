@@ -27,6 +27,7 @@ import {
   BookmarkCheck,
   CheckCircle2,
   Copy,
+  Mail,
 } from 'lucide-react';
 
 export const DEFAULT_FOUNTAIN_LOGO_SVG = `data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" width="200" height="200">
@@ -1026,24 +1027,35 @@ export const VisualFrontPageEditor: React.FC<VisualFrontPageEditorProps> = ({
               />
             </div>
 
-            {/* Corresponding Author Email Section (Focus Target 4) */}
-            <div className="mb-5 text-center text-[11px] bg-amber-50/80 border border-amber-200 p-2.5 rounded-lg">
-              <span className="font-sans font-bold text-amber-900">Corresponding Author Email: </span>
-              <input
-                type="text"
-                value={metadata.correspondingAuthor || 'ademola201052@yahoo.com'}
+            {/* Corresponding Author Email Section */}
+            <div className="mb-5 text-center text-[11px] bg-amber-50/80 border border-amber-200 p-2.5 rounded-lg space-y-1">
+              <div className="flex items-center justify-between mb-1">
+                <span className="font-sans font-bold text-amber-900 text-[9.5px] uppercase tracking-wider flex items-center gap-1">
+                  <Mail className="w-3 h-3 text-amber-700" />
+                  <span>Corresponding Author & Contact Info</span>
+                </span>
+                <span className="text-[8.5px] font-mono text-amber-800 bg-amber-100 border border-amber-300 px-1.5 py-0.2 rounded font-semibold">
+                  Auto-Detected from Manuscript
+                </span>
+              </div>
+              <textarea
+                value={metadata.correspondingAuthor || ''}
                 onChange={(e) => updateField('correspondingAuthor', e.target.value)}
-                className="text-amber-800 font-bold underline bg-white border border-amber-300 focus:border-amber-500 focus:ring-2 focus:ring-amber-500/20 outline-none rounded px-2 py-0.5 text-center font-mono text-[11px]"
+                placeholder="ademola201052@yahoo.com (Falade, A.)"
+                rows={2}
+                className="w-full text-center text-amber-900 font-medium bg-white border border-amber-300 focus:border-amber-500 focus:ring-2 focus:ring-amber-500/20 outline-none rounded-md p-1.5 font-mono text-[11px] resize-y transition-all shadow-2xs"
               />
             </div>
 
-            {/* Abstract & Article Info 2-Column Grid (Focus Target 5) */}
+            {/* Abstract & Article Info 2-Column Grid */}
             <div className="border-t-2 border-b-2 border-slate-900 py-3 mb-6 grid grid-cols-1 md:grid-cols-12 gap-4 font-sans">
               {/* Abstract Main Box */}
               <div className="md:col-span-8 border-b md:border-b-0 md:border-r border-slate-200 pb-3 md:pb-0 md:pr-4 space-y-1.5">
                 <div className="font-bold text-xs uppercase tracking-wider text-slate-900 border-b border-slate-900 pb-0.5 mb-1.5 flex items-center justify-between">
                   <span>ABSTRACT</span>
-                  <span className="text-[9px] font-normal text-indigo-600 uppercase">Auto-Detected</span>
+                  <span className="text-[8.5px] font-mono text-indigo-700 bg-indigo-50 border border-indigo-200 px-1.5 py-0.2 rounded font-semibold">
+                    Auto-Detected from Manuscript
+                  </span>
                 </div>
                 <textarea
                   value={metadata.abstract || ''}
@@ -1056,51 +1068,67 @@ export const VisualFrontPageEditor: React.FC<VisualFrontPageEditorProps> = ({
 
               {/* Article Info Sidebar */}
               <div className="md:col-span-4 space-y-2.5 text-[10px]">
-                <div className="font-bold text-xs uppercase tracking-wider text-slate-900 border-b border-slate-900 pb-0.5 mb-1.5">
-                  ARTICLE INFO
+                <div className="font-bold text-xs uppercase tracking-wider text-slate-900 border-b border-slate-900 pb-0.5 mb-1.5 flex items-center justify-between">
+                  <span>ARTICLE INFO</span>
+                  <span className="text-[8px] font-mono text-slate-600 bg-slate-100 border border-slate-200 px-1 py-0.2 rounded">
+                    Auto-Detected
+                  </span>
                 </div>
 
                 {/* Article History */}
-                <div className="space-y-1 bg-slate-50 p-2 rounded border border-slate-200">
-                  <div className="font-bold text-slate-800 text-[10px]">Article history:</div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-slate-500">Received:</span>
-                    <input
-                      type="text"
-                      value={metadata.receivedDate || 'September 2025'}
-                      onChange={(e) => updateField('receivedDate', e.target.value)}
-                      className="text-right text-[10px] text-slate-800 font-medium bg-transparent hover:bg-white outline-none rounded w-28"
-                    />
+                <div className="space-y-1.5 bg-slate-50 p-2.5 rounded-lg border border-slate-200">
+                  <div className="font-bold text-slate-800 text-[10px] flex items-center justify-between">
+                    <span>Article history:</span>
+                    <span className="text-[8px] font-mono text-indigo-600">Auto-Detect</span>
                   </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-slate-500">Revised:</span>
-                    <input
-                      type="text"
-                      value={metadata.revisedDate || 'January 2026'}
-                      onChange={(e) => updateField('revisedDate', e.target.value)}
-                      className="text-right text-[10px] text-slate-800 font-medium bg-transparent hover:bg-white outline-none rounded w-28"
-                    />
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-slate-500">Accepted:</span>
-                    <input
-                      type="text"
-                      value={metadata.acceptedDate || 'February 2026'}
-                      onChange={(e) => updateField('acceptedDate', e.target.value)}
-                      className="text-right text-[10px] text-slate-800 font-medium bg-transparent hover:bg-white outline-none rounded w-28"
-                    />
+                  <div className="space-y-1 text-[10px]">
+                    <div className="flex items-center justify-between gap-1">
+                      <span className="text-slate-500 shrink-0">Received:</span>
+                      <textarea
+                        value={metadata.receivedDate || ''}
+                        onChange={(e) => updateField('receivedDate', e.target.value)}
+                        placeholder="September 2025"
+                        rows={1}
+                        className="text-right text-[10px] text-slate-800 font-medium bg-white border border-slate-200 focus:border-indigo-500 outline-none rounded px-1.5 py-0.5 w-full resize-y font-sans"
+                      />
+                    </div>
+                    <div className="flex items-center justify-between gap-1">
+                      <span className="text-slate-500 shrink-0">Revised:</span>
+                      <textarea
+                        value={metadata.revisedDate || ''}
+                        onChange={(e) => updateField('revisedDate', e.target.value)}
+                        placeholder="January 2026"
+                        rows={1}
+                        className="text-right text-[10px] text-slate-800 font-medium bg-white border border-slate-200 focus:border-indigo-500 outline-none rounded px-1.5 py-0.5 w-full resize-y font-sans"
+                      />
+                    </div>
+                    <div className="flex items-center justify-between gap-1">
+                      <span className="text-slate-500 shrink-0">Accepted:</span>
+                      <textarea
+                        value={metadata.acceptedDate || ''}
+                        onChange={(e) => updateField('acceptedDate', e.target.value)}
+                        placeholder="February 2026"
+                        rows={1}
+                        className="text-right text-[10px] text-slate-800 font-medium bg-white border border-slate-200 focus:border-indigo-500 outline-none rounded px-1.5 py-0.5 w-full resize-y font-sans"
+                      />
+                    </div>
                   </div>
                 </div>
 
                 {/* Keywords */}
-                <div className="bg-slate-50 p-2 rounded border border-slate-200 space-y-1">
-                  <div className="font-bold text-slate-800 text-[10px]">Keywords:</div>
+                <div className="bg-slate-50 p-2.5 rounded-lg border border-slate-200 space-y-1">
+                  <div className="flex items-center justify-between">
+                    <div className="font-bold text-slate-800 text-[10px]">Keywords:</div>
+                    <span className="text-[8px] font-mono text-indigo-700 bg-indigo-50 border border-indigo-200 px-1 py-0.2 rounded font-semibold">
+                      Auto-Detected from Manuscript
+                    </span>
+                  </div>
                   <textarea
                     value={metadata.keywords || ''}
                     onChange={(e) => updateField('keywords', e.target.value)}
                     placeholder="Viscosity, Heavy oil, Solvent, Dynamic, Kinematic"
-                    rows={2}
-                    className="w-full text-[10px] text-slate-800 bg-transparent hover:bg-white outline-none rounded resize-none"
+                    rows={3}
+                    className="w-full text-[10px] text-slate-800 bg-white border border-slate-200 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 outline-none rounded p-1.5 resize-y font-sans shadow-2xs transition-all"
                   />
                 </div>
 
