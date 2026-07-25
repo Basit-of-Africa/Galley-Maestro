@@ -46,7 +46,7 @@ export const MetadataForm: React.FC<MetadataFormProps> = ({
   const [validationError, setValidationError] = useState<string | null>(null);
 
   // Form Fields State
-  const [journalName, setJournalName] = useState('Journal of Advanced Scholarly Research');
+  const [journalName, setJournalName] = useState('Fountain Journal of Natural and Applied Sciences');
   const [volume, setVolume] = useState('14');
   const [issue, setIssue] = useState('2');
   const [year, setYear] = useState(new Date().getFullYear().toString());

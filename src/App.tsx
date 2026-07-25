@@ -12,7 +12,7 @@ import { GalleyResponse, GalleyMetadata, BulkBatchItem, BulkBatchResult } from '
 import { ShieldCheck, Sparkles, Layout, FileText, Layers } from 'lucide-react';
 
 const INITIAL_METADATA: GalleyMetadata = {
-  journalName: 'FOUNTAIN JOURNAL OF NATURAL & APPLIED SCIENCES',
+  journalName: 'Fountain Journal of Natural and Applied Sciences',
   subTitle: 'A Publication of the College of Natural & Applied Sciences',
   publisherName: 'Fountain University, Osogbo, Nigeria',
   leftLogoUrl: DEFAULT_FOUNTAIN_LOGO_SVG,
