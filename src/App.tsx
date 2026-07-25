@@ -306,21 +306,16 @@ export default function App() {
       formData.append('useSampleType', targetItem.sampleType);
     }
 
-    const meta = lastBatchMetadata || {};
-    formData.append('journalName', meta.journalName || '');
-    formData.append('volume', meta.volume || '');
-    formData.append('issue', meta.issue || '');
-    formData.append('year', meta.year || new Date().getFullYear().toString());
-    formData.append('doi', meta.doi ? `${meta.doi}-${itemIndex + 1}` : '');
-    formData.append('title', meta.title || '');
-    formData.append('authors', meta.authors || '');
-    formData.append('affiliation', meta.affiliation || '');
-    formData.append('abstract', meta.abstract || '');
-    formData.append('keywords', meta.keywords || '');
-    formData.append('orcid', meta.orcid || '');
-    formData.append('correspondingAuthor', meta.correspondingAuthor || '');
-    formData.append('addWatermark', meta.addWatermark ? 'true' : 'false');
-    formData.append('twoColumn', meta.twoColumn ? 'true' : 'false');
+    const meta = { ...metadata, ...(lastBatchMetadata || {}) };
+    Object.entries(meta).forEach(([key, val]) => {
+      if (val !== undefined && val !== null) {
+        if (key === 'doi' && val) {
+          formData.append('doi', `${val}-${itemIndex + 1}`);
+        } else {
+          formData.append(key, String(val));
+        }
+      }
+    });
 
     const startTime = Date.now();
 
@@ -518,6 +513,8 @@ export default function App() {
               className={showRightColumn ? 'lg:col-span-5' : 'lg:col-span-12 max-w-3xl mx-auto w-full'}
             >
               <MetadataForm
+                activeMetadata={metadata}
+                onChangeMetadata={setMetadata}
                 onSubmitSingle={handleSingleSubmit}
                 onSubmitBulk={handleBulkSubmit}
                 isLoading={isLoading}

@@ -17,6 +17,8 @@ import {
 import { GalleyMetadata, BulkBatchItem } from '../types.js';
 
 interface MetadataFormProps {
+  activeMetadata?: GalleyMetadata;
+  onChangeMetadata?: (newMeta: GalleyMetadata) => void;
   onSubmitSingle: (formData: FormData) => void;
   onSubmitBulk: (batchItems: BulkBatchItem[], baseMetadata: GalleyMetadata) => void;
   isLoading: boolean;
@@ -26,6 +28,8 @@ interface MetadataFormProps {
 }
 
 export const MetadataForm: React.FC<MetadataFormProps> = ({
+  activeMetadata,
+  onChangeMetadata,
   onSubmitSingle,
   onSubmitBulk,
   isLoading,
@@ -45,22 +49,54 @@ export const MetadataForm: React.FC<MetadataFormProps> = ({
   const [dragActive, setDragActive] = useState<boolean>(false);
   const [validationError, setValidationError] = useState<string | null>(null);
 
-  // Form Fields State
-  const [journalName, setJournalName] = useState('Fountain Journal of Natural and Applied Sciences');
-  const [volume, setVolume] = useState('14');
-  const [issue, setIssue] = useState('2');
-  const [year, setYear] = useState(new Date().getFullYear().toString());
-  const [doi, setDoi] = useState('10.1080/01234567.2026.890123');
-  const [title, setTitle] = useState('');
-  const [authors, setAuthors] = useState('');
-  const [affiliation, setAffiliation] = useState('');
-  const [abstract, setAbstract] = useState('');
-  const [keywords, setKeywords] = useState('');
-  const [orcid, setOrcid] = useState('0000-0002-1825-0097');
-  const [correspondingAuthor, setCorrespondingAuthor] = useState('ademola201052@yahoo.com');
-  const [addWatermark, setAddWatermark] = useState(true);
-  const [twoColumn, setTwoColumn] = useState(false);
+  // Form Fields State - initialized and synced with activeMetadata
+  const [journalName, setJournalName] = useState(activeMetadata?.journalName || 'Fountain Journal of Natural and Applied Sciences');
+  const [volume, setVolume] = useState(activeMetadata?.volume || '14');
+  const [issue, setIssue] = useState(activeMetadata?.issue || '2');
+  const [year, setYear] = useState(activeMetadata?.year || new Date().getFullYear().toString());
+  const [doi, setDoi] = useState(activeMetadata?.doi || '10.1080/01234567.2026.890123');
+  const [title, setTitle] = useState(activeMetadata?.title || '');
+  const [authors, setAuthors] = useState(activeMetadata?.authors || '');
+  const [affiliation, setAffiliation] = useState(activeMetadata?.affiliation || '');
+  const [abstract, setAbstract] = useState(activeMetadata?.abstract || '');
+  const [keywords, setKeywords] = useState(activeMetadata?.keywords || '');
+  const [orcid, setOrcid] = useState(activeMetadata?.orcid || '0000-0002-1825-0097');
+  const [correspondingAuthor, setCorrespondingAuthor] = useState(activeMetadata?.correspondingAuthor || 'ademola201052@yahoo.com');
+  const [addWatermark, setAddWatermark] = useState(activeMetadata?.addWatermark ?? true);
+  const [twoColumn, setTwoColumn] = useState(activeMetadata?.twoColumn ?? false);
   const [showAdvanced, setShowAdvanced] = useState(false);
+
+  // Keep form fields synced when active template changes in Visual Editor tab
+  React.useEffect(() => {
+    if (activeMetadata) {
+      if (activeMetadata.journalName) setJournalName(activeMetadata.journalName);
+      if (activeMetadata.volume) setVolume(activeMetadata.volume);
+      if (activeMetadata.issue) setIssue(activeMetadata.issue);
+      if (activeMetadata.year) setYear(activeMetadata.year);
+      if (activeMetadata.doi) setDoi(activeMetadata.doi);
+      if (activeMetadata.title !== undefined) setTitle(activeMetadata.title);
+      if (activeMetadata.authors !== undefined) setAuthors(activeMetadata.authors);
+      if (activeMetadata.affiliation !== undefined) setAffiliation(activeMetadata.affiliation);
+      if (activeMetadata.abstract !== undefined) setAbstract(activeMetadata.abstract);
+      if (activeMetadata.keywords !== undefined) setKeywords(activeMetadata.keywords);
+      if (activeMetadata.orcid) setOrcid(activeMetadata.orcid);
+      if (activeMetadata.correspondingAuthor) setCorrespondingAuthor(activeMetadata.correspondingAuthor);
+      if (activeMetadata.addWatermark !== undefined) setAddWatermark(activeMetadata.addWatermark);
+      if (activeMetadata.twoColumn !== undefined) setTwoColumn(activeMetadata.twoColumn);
+    }
+  }, [
+    activeMetadata?.layoutTemplate,
+    activeMetadata?.journalName,
+    activeMetadata?.volume,
+    activeMetadata?.issue,
+    activeMetadata?.year,
+    activeMetadata?.doi,
+    activeMetadata?.subTitle,
+    activeMetadata?.publisherName,
+    activeMetadata?.leftLogoUrl,
+    activeMetadata?.rightLogoUrl,
+    activeMetadata?.runningHeader,
+  ]);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -245,6 +281,7 @@ export const MetadataForm: React.FC<MetadataFormProps> = ({
     e.preventDefault();
 
     const baseMetadata: GalleyMetadata = {
+      ...(activeMetadata || {}),
       journalName,
       volume,
       issue,
@@ -281,20 +318,11 @@ export const MetadataForm: React.FC<MetadataFormProps> = ({
         formData.append('useSampleType', activeSampleType);
       }
 
-      formData.append('journalName', journalName);
-      formData.append('volume', volume);
-      formData.append('issue', issue);
-      formData.append('year', baseMetadata.year || '');
-      formData.append('doi', doi);
-      formData.append('title', title);
-      formData.append('authors', authors);
-      formData.append('affiliation', affiliation);
-      formData.append('abstract', abstract);
-      formData.append('keywords', keywords);
-      formData.append('orcid', orcid);
-      formData.append('correspondingAuthor', correspondingAuthor);
-      formData.append('addWatermark', addWatermark ? 'true' : 'false');
-      formData.append('twoColumn', twoColumn ? 'true' : 'false');
+      Object.entries(baseMetadata).forEach(([key, val]) => {
+        if (val !== undefined && val !== null) {
+          formData.append(key, String(val));
+        }
+      });
 
       onSubmitSingle(formData);
     }
@@ -310,6 +338,29 @@ export const MetadataForm: React.FC<MetadataFormProps> = ({
 
   return (
     <form onSubmit={handleSubmit} className="space-y-5">
+      {/* Inherited Active House Template Badge */}
+      <div className="bg-indigo-50/90 border border-indigo-200/80 rounded-xl p-3 flex items-center justify-between text-xs text-indigo-900 shadow-2xs">
+        <div className="flex items-center space-x-2.5">
+          <div className="p-1.5 bg-indigo-600 text-white rounded-lg shrink-0">
+            <Layers className="w-4 h-4" />
+          </div>
+          <div>
+            <div className="font-bold text-[11px] uppercase tracking-wider text-indigo-950 flex items-center gap-1.5">
+              <span>Inherited Galley Proof Style</span>
+              <span className="bg-indigo-600 text-white text-[9px] font-mono px-1.5 py-0.2 rounded font-semibold uppercase">
+                {activeMetadata?.layoutTemplate || 'fountain'}
+              </span>
+            </div>
+            <p className="text-[11px] text-indigo-800 font-medium line-clamp-1">
+              {activeMetadata?.journalName || 'Fountain Journal of Natural and Applied Sciences'}
+            </p>
+          </div>
+        </div>
+        <span className="text-[10px] text-indigo-700 font-bold bg-white border border-indigo-200 px-2 py-1 rounded-md shadow-2xs shrink-0">
+          Template Active ✓
+        </span>
+      </div>
+
       {/* Mode Switcher Toggle Bar */}
       <div className="bg-white border border-slate-200 rounded-xl p-2.5 shadow-2xs flex items-center justify-between">
         <div className="flex items-center space-x-1.5 bg-slate-100/80 p-1 rounded-lg border border-slate-200/80 w-full sm:w-auto">
