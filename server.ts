@@ -230,7 +230,7 @@ async function startServer() {
     console.error('[API Server Error]', err);
     const statusCode = err.status || err.statusCode || 500;
     res.status(statusCode).json({
-      error: err.message || 'An error occurred on the galley engine server.',
+      error: err.message || 'An error occurred on the Galley Maestro server.',
     });
   });
 

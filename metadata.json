@@ -1,5 +1,5 @@
 {
-  "name": "Galley Engine",
+  "name": "Galley Maestro",
   "description": "Journal manuscript typesetting and print-ready galley proof PDF generator.",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]

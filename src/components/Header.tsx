@@ -10,7 +10,7 @@ export const Header: React.FC = () => {
         </div>
         <div className="flex items-baseline space-x-2">
           <h1 className="font-bold text-xl tracking-tight text-slate-800 font-sans">
-            Galley<span className="text-indigo-600">Engine</span>
+            Galley<span className="text-indigo-600">Maestro</span>
           </h1>
           <span className="hidden sm:inline-block text-xs font-medium text-slate-400">
             Editorial Portal
