@@ -433,7 +433,7 @@ export default function App() {
               Publishing-House Galley Proof & Front Page Studio
             </h2>
             <p className="text-slate-300 text-xs sm:text-sm leading-relaxed">
-              Visually edit journal logos, headers, author ORCID badges, corresponding author email (<span className="font-semibold text-amber-300">ademola201052@yahoo.com</span>), and article info sidebars matching exact academic templates (e.g. Fountain Journal of Natural and Applied Sciences).
+              Visually edit journal logos, headers, author ORCID badges, corresponding author email and article info sidebars matching exact academic templates (e.g. Fountain Journal of Natural and Applied Sciences).
             </p>
           </div>
 
