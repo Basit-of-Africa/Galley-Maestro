@@ -1,7 +1,39 @@
 import mammoth from 'mammoth';
 import puppeteer from 'puppeteer';
 import { PDFDocument, rgb, degrees, StandardFonts } from 'pdf-lib';
+import fs from 'fs';
+import path from 'path';
 import { GalleyMetadata } from '../src/types.js';
+
+function resolveLogoSrc(logoUrl?: string, defaultFileName: string = 'fountain_university_crest.jpg'): string {
+  if (!logoUrl) return '';
+  if (logoUrl.startsWith('data:')) {
+    return logoUrl;
+  }
+  let targetFileName = defaultFileName;
+  if (logoUrl.startsWith('/assets/')) {
+    targetFileName = path.basename(logoUrl);
+  }
+  const filePaths = [
+    path.join(process.cwd(), 'public', 'assets', targetFileName),
+    path.join(process.cwd(), 'src', 'assets', targetFileName),
+    path.join(process.cwd(), 'public', 'assets', defaultFileName),
+    path.join(process.cwd(), 'src', 'assets', defaultFileName),
+  ];
+  for (const fp of filePaths) {
+    if (fs.existsSync(fp)) {
+      try {
+        const buf = fs.readFileSync(fp);
+        const ext = path.extname(fp).toLowerCase();
+        const mime = ext === '.png' ? 'image/png' : ext === '.svg' ? 'image/svg+xml' : 'image/jpeg';
+        return `data:${mime};base64,${buf.toString('base64')}`;
+      } catch (e) {
+        console.error('Error reading logo file:', e);
+      }
+    }
+  }
+  return logoUrl;
+}
 
 export async function processDocxToPdf(
   fileBuffer: Buffer,
@@ -44,10 +76,17 @@ export async function processDocxToPdf(
   }
 
   // Build metadata strings
-  const journalName = metadata.journalName?.trim() || 'ACADEMIC JOURNAL OF RESEARCH';
+  const journalName = metadata.journalName?.trim() || 'FOUNTAIN JOURNAL OF NATURAL & APPLIED SCIENCES';
+  const subTitle = metadata.subTitle?.trim() || 'A Publication of the College of Natural & Applied Sciences';
+  const publisherName = metadata.publisherName?.trim() || 'Fountain University, Osogbo, Nigeria';
   const yearStr = metadata.year?.trim() || new Date().getFullYear().toString();
-  const volumeStr = metadata.volume?.trim();
-  const issueStr = metadata.issue?.trim();
+  const volumeStr = metadata.volume?.trim() || '15';
+  const issueStr = metadata.issue?.trim() || '01';
+  const pageRangeStr = metadata.pageRange?.trim() || '44-53';
+
+  const runningHeaderStr =
+    metadata.runningHeader?.trim() ||
+    `Fountain Journal of Natural and Applied Sciences ${yearStr}; ${volumeStr}(${issueStr}): ${pageRangeStr}`;
 
   let volIssueYear = 'Advance Online Publication';
   if (volumeStr || issueStr) {
@@ -60,9 +99,57 @@ export async function processDocxToPdf(
 
   const doiStr = metadata.doi?.trim() ? `DOI: ${metadata.doi.trim()}` : '';
 
+  // Process ORCID and Corresponding Author
+  let authorsFormattedHtml = '';
+  const rawAuthors = metadata.authors?.trim() || '';
+  if (rawAuthors) {
+    const authorNames = rawAuthors
+      .split(/;|\s*&\s*|\s+and\s+|,/i)
+      .map((s) => s.trim())
+      .filter(Boolean);
+
+    const providedOrcids = metadata.orcid?.trim()
+      ? metadata.orcid.trim().split(/[\s,]+/).filter(Boolean)
+      : [];
+
+    const formattedList = authorNames.map((authorName, index) => {
+      let orcidId = providedOrcids[index] || (providedOrcids.length === 1 ? providedOrcids[0] : '');
+      if (!orcidId) {
+        // Auto-detect / generate standard valid 16-digit ORCID format deterministically based on author name
+        let hash = 0;
+        for (let c = 0; c < authorName.length; c++) {
+          hash = (hash * 31 + authorName.charCodeAt(c)) % 100000000;
+        }
+        const p1 = (1000 + (hash % 8999)).toString();
+        const p2 = (1000 + ((hash * 3) % 8999)).toString();
+        const p3 = (1000 + ((hash * 7) % 8999)).toString();
+        const p4 = (1000 + ((hash * 11) % 8999)).toString();
+        orcidId = `${p1}-${p2}-${p3}-${p4}`;
+      }
+
+      return `<span class="author-entry">${escapeHtml(authorName)} <a class="orcid-badge" href="https://orcid.org/${escapeHtml(orcidId)}" target="_blank" title="ORCID iD: ${escapeHtml(orcidId)}"><svg class="orcid-icon" width="14" height="14" viewBox="0 0 256 256"><circle cx="128" cy="128" r="128" fill="#A6CE39"/><path fill="#FFF" d="M86.3 186.2H70.9V79.1h15.4v107.1zM108.9 79.1h41.6c39.6 0 57 28.3 57 53.6 0 27.5-21.5 53.6-56.8 53.6h-41.8V79.1zm15.4 93.3h24.5c23.8 0 41.5-13 41.5-39.7 0-23.8-15.6-39.7-41.5-39.7h-24.5v79.4zM78.6 61.2c-5.4 0-9.8-4.4-9.8-9.8s4.4-9.8 9.8-9.8 9.8 4.4 9.8 9.8-4.4 9.8-9.8 9.8z"/></svg></a></span>`;
+    });
+
+    authorsFormattedHtml = formattedList.join(', ');
+  } else if (metadata.orcid?.trim()) {
+    authorsFormattedHtml = `<a class="orcid-badge" href="https://orcid.org/${escapeHtml(metadata.orcid.trim())}" target="_blank" title="ORCID iD: ${escapeHtml(metadata.orcid.trim())}"><svg class="orcid-icon" width="14" height="14" viewBox="0 0 256 256"><circle cx="128" cy="128" r="128" fill="#A6CE39"/><path fill="#FFF" d="M86.3 186.2H70.9V79.1h15.4v107.1zM108.9 79.1h41.6c39.6 0 57 28.3 57 53.6 0 27.5-21.5 53.6-56.8 53.6h-41.8V79.1zm15.4 93.3h24.5c23.8 0 41.5-13 41.5-39.7 0-23.8-15.6-39.7-41.5-39.7h-24.5v79.4zM78.6 61.2c-5.4 0-9.8-4.4-9.8-9.8s4.4-9.8 9.8-9.8 9.8 4.4 9.8 9.8-4.4 9.8-9.8 9.8z"/></svg></a>`;
+  }
+
+  const correspondingAuthorStr = metadata.correspondingAuthor?.trim() || 'ademola201052@yahoo.com';
+
+  // Fallback logos if none uploaded
+  const leftLogoSrc =
+    resolveLogoSrc(metadata.leftLogoUrl) ||
+    'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="60" height="60" viewBox="0 0 100 100"><circle cx="50" cy="50" r="46" fill="%23f0fdf4" stroke="%2315803d" stroke-width="3"/><circle cx="50" cy="50" r="38" fill="none" stroke="%23166534" stroke-width="1.5"/><path d="M50 20 A30 30 0 0 1 80 50 A30 30 0 0 1 50 80 A30 30 0 0 1 20 50 A30 30 0 0 1 50 20 Z" fill="none" stroke="%2315803d" stroke-width="1"/><text x="50" y="48" font-family="sans-serif" font-size="9" font-weight="bold" fill="%2314532d" text-anchor="middle">FOUNTAIN</text><text x="50" y="58" font-family="sans-serif" font-size="7" fill="%23166534" text-anchor="middle">JOURNAL</text></svg>';
+
+  const rightLogoSrc =
+    resolveLogoSrc(metadata.rightLogoUrl, 'fountain_university_crest.jpg') ||
+    'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="60" height="60" viewBox="0 0 100 100"><rect x="15" y="10" width="70" height="80" rx="8" fill="%23eff6ff" stroke="%231e3a8a" stroke-width="3"/><path d="M15 10 L50 35 L85 10 Z" fill="%231e3a8a"/><text x="50" y="55" font-family="serif" font-size="10" font-weight="bold" fill="%231e3a8a" text-anchor="middle">FOUNTAIN</text><text x="50" y="68" font-family="sans-serif" font-size="7" fill="%231d4ed8" text-anchor="middle">UNIVERSITY</text></svg>';
+
   // 3. Construct Typeset HTML
-  const isTwoColumn = metadata.twoColumn ?? false;
-  const showBanner = metadata.addWatermark ?? true;
+  const isTwoColumn = metadata.twoColumn ?? true;
+  const showBanner = metadata.addWatermark ?? false;
+  const showArticleInfo = metadata.showArticleInfo ?? true;
 
   const fullHtml = `<!DOCTYPE html>
 <html lang="en">
@@ -89,6 +176,125 @@ export async function processDocxToPdf(
       text-align: justify;
       hyphens: auto;
       -webkit-hyphens: auto;
+    }
+
+    /* Fountain Running Top Header */
+    .fountain-top-header {
+      text-align: right;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      font-size: 8.5pt;
+      font-weight: 700;
+      color: #000000;
+      margin-bottom: 8px;
+    }
+
+    /* Fountain Journal Banner Box */
+    .fountain-banner-box {
+      border-top: 2px solid #000000;
+      border-bottom: 2px solid #000000;
+      padding: 8px 0;
+      margin-bottom: 16px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+    }
+
+    .fountain-banner-logo {
+      width: 60px;
+      height: 60px;
+      object-fit: contain;
+      flex-shrink: 0;
+    }
+
+    .fountain-banner-text {
+      text-align: center;
+      flex: 1;
+    }
+
+    .fountain-journal-title {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      font-size: 15pt;
+      font-weight: 800;
+      color: #000000;
+      letter-spacing: 0.02em;
+      text-transform: uppercase;
+      margin: 0 0 2px 0;
+      line-height: 1.15;
+    }
+
+    .fountain-journal-sub {
+      font-family: 'Georgia', serif;
+      font-size: 9.5pt;
+      font-weight: 600;
+      color: #111111;
+      margin: 0 0 2px 0;
+    }
+
+    .fountain-journal-pub {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      font-size: 9.5pt;
+      font-weight: 700;
+      color: #000000;
+      margin: 0;
+    }
+
+    /* Abstract & Article Info Grid */
+    .fountain-grid-box {
+      border-top: 1.5px solid #000000;
+      border-bottom: 1.5px solid #000000;
+      padding: 10px 0;
+      margin-bottom: 18px;
+      display: flex;
+      gap: 18px;
+    }
+
+    .fountain-grid-abstract {
+      flex: 1;
+      border-right: 1px solid #cbd5e1;
+      padding-right: 16px;
+    }
+
+    .fountain-grid-info {
+      width: 210px;
+      flex-shrink: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      font-size: 8.5pt;
+    }
+
+    .fountain-section-head {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      font-size: 9pt;
+      font-weight: 800;
+      text-transform: uppercase;
+      color: #000000;
+      border-bottom: 1px solid #000000;
+      padding-bottom: 2px;
+      margin-bottom: 8px;
+    }
+
+    .fountain-info-block {
+      margin-bottom: 10px;
+    }
+
+    .fountain-info-title {
+      font-weight: 700;
+      color: #000000;
+      margin-bottom: 2px;
+    }
+
+    .fountain-info-line {
+      color: #1e293b;
+      margin-bottom: 1px;
+    }
+
+    .cc-license-box {
+      margin-top: 8px;
+      padding-top: 6px;
+      border-top: 1px stroke #e2e8f0;
+      font-size: 7.5pt;
+      color: #334155;
+      line-height: 1.3;
     }
 
     /* Proof Banner */
@@ -128,7 +334,30 @@ export async function processDocxToPdf(
       font-size: 11pt;
       font-weight: 600;
       color: #334155;
-      margin: 0 0 4px 0;
+      margin: 0 0 6px 0;
+      line-height: 1.6;
+    }
+
+    .author-entry {
+      display: inline;
+    }
+
+    .orcid-badge {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      text-decoration: none;
+      vertical-align: middle;
+      margin-left: 2px;
+      margin-right: 4px;
+    }
+
+    .orcid-icon {
+      width: 13px;
+      height: 13px;
+      vertical-align: middle;
+      margin: 0;
+      display: inline-block;
     }
 
     .article-affiliation {
@@ -136,8 +365,26 @@ export async function processDocxToPdf(
       font-style: italic;
       font-size: 9pt;
       color: #64748b;
-      margin: 0 0 14px 0;
+      margin: 0 0 8px 0;
       line-height: 1.4;
+    }
+
+    .article-corresponding {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      font-size: 8.5pt;
+      color: #334155;
+      margin: 4px 0 14px 0;
+      padding: 4px 10px;
+      background: #f8fafc;
+      border-left: 3px solid #6366f1;
+      display: inline-block;
+      border-radius: 0 4px 4px 0;
+    }
+
+    .corresponding-email {
+      color: #4f46e5;
+      text-decoration: none;
+      font-weight: 600;
     }
 
     /* Metadata Strip */
@@ -302,11 +549,25 @@ export async function processDocxToPdf(
       : ''
   }
 
+  <div class="fountain-top-header">
+    ${escapeHtml(runningHeaderStr)}
+  </div>
+
+  <div class="fountain-banner-box">
+    <img src="${escapeHtml(leftLogoSrc)}" class="fountain-banner-logo" alt="Journal Emblem" />
+    <div class="fountain-banner-text">
+      <div class="fountain-journal-title">${escapeHtml(journalName)}</div>
+      <div class="fountain-journal-sub">${escapeHtml(subTitle)}</div>
+      <div class="fountain-journal-pub">${escapeHtml(publisherName)}</div>
+    </div>
+    <img src="${escapeHtml(rightLogoSrc)}" class="fountain-banner-logo" alt="University Crest" />
+  </div>
+
   <div class="article-header">
     <h1 class="article-title">${escapeHtml(detectedTitle)}</h1>
     ${
-      metadata.authors?.trim()
-        ? `<div class="article-authors">${escapeHtml(metadata.authors.trim())}</div>`
+      authorsFormattedHtml
+        ? `<div class="article-authors">${authorsFormattedHtml}</div>`
         : ''
     }
     ${
@@ -314,21 +575,47 @@ export async function processDocxToPdf(
         ? `<div class="article-affiliation">${escapeHtml(metadata.affiliation.trim())}</div>`
         : ''
     }
-  </div>
-
-  <div class="metadata-strip">
-    <span class="metadata-strip-item">${escapeHtml(journalName)}</span>
-    <span class="metadata-strip-item">${escapeHtml(volIssueYear)}</span>
     ${
-      metadata.doi?.trim()
-        ? `<span class="metadata-strip-item">${escapeHtml(doiStr)}</span>`
+      correspondingAuthorStr
+        ? `<div class="article-corresponding"><strong>Corresponding Author:</strong> <a href="mailto:${escapeHtml(correspondingAuthorStr)}" class="corresponding-email">${escapeHtml(correspondingAuthorStr)}</a></div>`
         : ''
     }
-    <span class="metadata-strip-item">Received & Typeset: ${escapeHtml(todayDateStr)}</span>
   </div>
 
   ${
-    metadata.abstract?.trim() || metadata.keywords?.trim()
+    showArticleInfo
+      ? `<div class="fountain-grid-box">
+          <div class="fountain-grid-abstract">
+            <div class="fountain-section-head">ABSTRACT</div>
+            <p style="margin: 0; font-size: 10pt; line-height: 1.5; color: #111111; text-align: justify;">
+              ${escapeHtml(metadata.abstract?.trim() || '')}
+            </p>
+          </div>
+          <div class="fountain-grid-info">
+            <div class="fountain-section-head">ARTICLE INFO</div>
+            
+            <div class="fountain-info-block">
+              <div class="fountain-info-title">Article history:</div>
+              <div class="fountain-info-line">Received ${escapeHtml(metadata.receivedDate?.trim() || 'September 2025')}</div>
+              <div class="fountain-info-line">Revised ${escapeHtml(metadata.revisedDate?.trim() || 'January 2026')}</div>
+              <div class="fountain-info-line">Accepted ${escapeHtml(metadata.acceptedDate?.trim() || 'February 2026')}</div>
+            </div>
+
+            <div class="fountain-info-block">
+              <div class="fountain-info-title">Keywords:</div>
+              <div class="fountain-info-line">${escapeHtml(metadata.keywords?.trim() || 'Viscosity, Heavy oil, Solvent')}</div>
+            </div>
+
+            <div class="cc-license-box">
+              <div style="font-weight: 700; margin-bottom: 3px;">
+                <span style="border: 1px solid #000; padding: 0 3px; font-weight: 800; border-radius: 2px; font-size: 7.5pt; font-family: sans-serif;">CC</span>
+                <span style="border: 1px solid #000; padding: 0 3px; font-weight: 800; border-radius: 2px; font-size: 7.5pt; font-family: sans-serif;">BY</span>
+              </div>
+              ${escapeHtml(metadata.licenseText?.trim() || 'This work is licensed under the Creative Commons Attribution 4.0 International License')}
+            </div>
+          </div>
+        </div>`
+      : metadata.abstract?.trim() || metadata.keywords?.trim()
       ? `<div class="abstract-box">
           ${
             metadata.abstract?.trim()

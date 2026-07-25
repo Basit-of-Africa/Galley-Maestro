@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import JSZip from 'jszip';
 import { Header } from './components/Header.js';
@@ -6,16 +6,99 @@ import { MetadataForm } from './components/MetadataForm.js';
 import { PdfViewerPane } from './components/PdfViewerPane.js';
 import { BatchResultPane } from './components/BatchResultPane.js';
 import { MetricsDashboard, TypesettingMetrics } from './components/MetricsDashboard.js';
+import { VisualFrontPageEditor, DEFAULT_FOUNTAIN_LOGO_SVG, DEFAULT_FOUNTAIN_CREST_URL } from './components/VisualFrontPageEditor.js';
 import { ErrorAlert } from './components/ErrorAlert.js';
 import { GalleyResponse, GalleyMetadata, BulkBatchItem, BulkBatchResult } from './types.js';
-import { ShieldCheck, Sparkles, Files, Layers } from 'lucide-react';
+import { ShieldCheck, Sparkles, Layout, FileText, Layers } from 'lucide-react';
+
+const INITIAL_METADATA: GalleyMetadata = {
+  journalName: 'FOUNTAIN JOURNAL OF NATURAL & APPLIED SCIENCES',
+  subTitle: 'A Publication of the College of Natural & Applied Sciences',
+  publisherName: 'Fountain University, Osogbo, Nigeria',
+  leftLogoUrl: DEFAULT_FOUNTAIN_LOGO_SVG,
+  rightLogoUrl: DEFAULT_FOUNTAIN_CREST_URL,
+  runningHeader: 'Fountain Journal of Natural and Applied Sciences 2026; 15(01): 44-53',
+  pageRange: '44-53',
+  year: '2026',
+  volume: '15',
+  issue: '01',
+  doi: '10.53704/fujnas.v15i1.1060',
+  title:
+    'Experimental study of improving Nigerian heavy crude oil (Agbabu bitumen) viscosity reduction by dilution with n-heptane, phenol, toluene, xylene, and naphtha',
+  authors: 'Falade, A. 1,2; Akinsete, O. O. 2; Aliu, H. O. 2; Mobolaji, O. 2; Oni, T. 1',
+  affiliation:
+    '1Department of Mineral & Petroleum Resources Engineering, School of Engineering, Federal Polytechnic, Ado Ekiti.\n2Department of Petroleum Engineering, University of Ibadan, Ibadan',
+  correspondingAuthor: 'ademola201052@yahoo.com',
+  orcid: '0000-0002-1825-0097, 0000-0001-8291-3012',
+  abstract:
+    'This experimental study examines the viscosity reduction of Nigerian heavy crude oil, specifically Agbabu bitumen, through dilution with selected solvents, including naphtha, n-heptane, phenol, toluene, and xylene. The influence of pressure variation on the solubility-driven reduction of viscosity was investigated.',
+  keywords: 'Viscosity, Heavy oil, Solvent, Dynamic, Kinematic',
+  receivedDate: 'September 2025',
+  revisedDate: 'January 2026',
+  acceptedDate: 'February 2026',
+  licenseType: 'CC BY 4.0',
+  licenseText: 'This work is licensed under the Creative Commons Attribution 4.0 International License',
+  showArticleInfo: true,
+  twoColumn: true,
+  layoutTemplate: 'fountain',
+  addWatermark: false,
+};
+
+async function parseJsonResponse(response: Response) {
+  let text = '';
+  try {
+    text = await response.text();
+  } catch {
+    throw new Error('Failed to read server response.');
+  }
+
+  let data: any = null;
+  try {
+    data = JSON.parse(text);
+  } catch {
+    const cleanText = text.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
+    if (!response.ok) {
+      if (cleanText.length > 0 && cleanText.length < 250) {
+        throw new Error(`Server Error (${response.status}): ${cleanText}`);
+      }
+      throw new Error(`Server request failed with status ${response.status}. Please ensure manuscript size is within limits.`);
+    }
+    if (cleanText.length > 0 && cleanText.length < 250) {
+      throw new Error(`Server returned non-JSON response: ${cleanText}`);
+    }
+    throw new Error(`Server returned an unexpected non-JSON response (${response.status}). Please check manuscript formatting or server state.`);
+  }
+
+  if (!response.ok) {
+    throw new Error(data?.error || `Server request failed with status ${response.status}`);
+  }
+
+  return data;
+}
 
 export default function App() {
+  const [activeTab, setActiveTab] = useState<'visual' | 'form'>('visual');
+  const [metadata, setMetadata] = useState<GalleyMetadata>(INITIAL_METADATA);
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [singleResult, setSingleResult] = useState<GalleyResponse | null>(null);
   const [batchResult, setBatchResult] = useState<BulkBatchResult | null>(null);
   const [lastBatchMetadata, setLastBatchMetadata] = useState<GalleyMetadata | null>(null);
+
+  // Load saved active house template from localStorage on mount if available
+  useEffect(() => {
+    try {
+      const savedHouseStyle = localStorage.getItem('galley_active_house_template');
+      if (savedHouseStyle) {
+        const parsed = JSON.parse(savedHouseStyle);
+        if (parsed && typeof parsed === 'object') {
+          setMetadata((prev) => ({ ...prev, ...parsed }));
+        }
+      }
+    } catch (e) {
+      console.error('Error loading saved house template:', e);
+    }
+  }, []);
 
   // Lightweight state tracker for typesetting performance metrics
   const [metrics, setMetrics] = useState<TypesettingMetrics>({
@@ -48,11 +131,7 @@ export default function App() {
         body: formData,
       });
 
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.error || 'Failed to generate galley proof PDF.');
-      }
+      const data = await parseJsonResponse(response);
 
       setSingleResult(data as GalleyResponse);
       recordMetric(true, Date.now() - startTime);
@@ -121,18 +200,15 @@ export default function App() {
         formData.append('useSampleType', item.sampleType);
       }
 
-      formData.append('journalName', baseMetadata.journalName || '');
-      formData.append('volume', baseMetadata.volume || '');
-      formData.append('issue', baseMetadata.issue || '');
-      formData.append('year', baseMetadata.year || new Date().getFullYear().toString());
-      formData.append('doi', baseMetadata.doi ? `${baseMetadata.doi}-${i + 1}` : '');
-      formData.append('title', baseMetadata.title || ''); // If empty, server auto-detects per manuscript!
-      formData.append('authors', baseMetadata.authors || '');
-      formData.append('affiliation', baseMetadata.affiliation || '');
-      formData.append('abstract', baseMetadata.abstract || '');
-      formData.append('keywords', baseMetadata.keywords || '');
-      formData.append('addWatermark', baseMetadata.addWatermark ? 'true' : 'false');
-      formData.append('twoColumn', baseMetadata.twoColumn ? 'true' : 'false');
+      Object.entries(baseMetadata).forEach(([key, val]) => {
+        if (val !== undefined && val !== null) {
+          if (key === 'doi' && val) {
+            formData.append('doi', `${val}-${i + 1}`);
+          } else {
+            formData.append(key, String(val));
+          }
+        }
+      });
 
       const startTime = Date.now();
 
@@ -142,11 +218,7 @@ export default function App() {
           body: formData,
         });
 
-        const data = await response.json();
-
-        if (!response.ok) {
-          throw new Error(data.error || 'Failed to process manuscript');
-        }
+        const data = await parseJsonResponse(response);
 
         currentBatch.items[i].status = 'completed';
         currentBatch.items[i].result = data as GalleyResponse;
@@ -245,6 +317,8 @@ export default function App() {
     formData.append('affiliation', meta.affiliation || '');
     formData.append('abstract', meta.abstract || '');
     formData.append('keywords', meta.keywords || '');
+    formData.append('orcid', meta.orcid || '');
+    formData.append('correspondingAuthor', meta.correspondingAuthor || '');
     formData.append('addWatermark', meta.addWatermark ? 'true' : 'false');
     formData.append('twoColumn', meta.twoColumn ? 'true' : 'false');
 
@@ -256,11 +330,7 @@ export default function App() {
         body: formData,
       });
 
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.error || 'Failed to process manuscript');
-      }
+      const data = await parseJsonResponse(response);
 
       // Successful retry
       updatedItems[itemIndex] = {
@@ -337,6 +407,19 @@ export default function App() {
     setSingleResult(itemResult);
   };
 
+  const handleVisualEditorGenerate = async () => {
+    const formData = new FormData();
+    formData.append('useSampleType', 'docx');
+
+    Object.entries(metadata).forEach(([key, val]) => {
+      if (val !== undefined && val !== null) {
+        formData.append(key, String(val));
+      }
+    });
+
+    await handleSingleSubmit(formData);
+  };
+
   const showRightColumn = Boolean(singleResult || batchResult);
 
   return (
@@ -349,17 +432,53 @@ export default function App() {
           <div className="relative z-10 max-w-3xl space-y-2">
             <div className="inline-flex items-center space-x-2 px-2.5 py-1 rounded bg-indigo-500/20 border border-indigo-500/30 text-indigo-300 text-xs font-semibold mb-1">
               <Sparkles className="w-3.5 h-3.5 text-indigo-400" />
-              <span>Automated Production-Grade Typesetting & Bulk Queue</span>
+              <span>Automated Production-Grade Typesetting & Front Page Visual Studio</span>
             </div>
             <h2 className="text-xl sm:text-2xl font-bold tracking-tight text-white">
-              Publishing-House Galley Proof Engine
+              Publishing-House Galley Proof & Front Page Studio
             </h2>
             <p className="text-slate-300 text-xs sm:text-sm leading-relaxed">
-              Upload single or bulk manuscript batches (<span className="font-semibold text-indigo-300">.docx</span> for house-style typesetting or <span className="font-semibold text-indigo-300">.pdf</span> for mark overlays). Bulk mode queues files sequentially and generates a zipped archive of print-ready proofs.
+              Visually edit journal logos, headers, author ORCID badges, corresponding author email (<span className="font-semibold text-amber-300">ademola201052@yahoo.com</span>), and article info sidebars matching exact academic templates (e.g. Fountain Journal of Natural and Applied Sciences).
             </p>
           </div>
 
           <div className="absolute -right-12 -bottom-12 w-64 h-64 bg-indigo-600/10 rounded-full blur-3xl pointer-events-none" />
+        </div>
+
+        {/* Studio Mode Selector Tabs */}
+        <div className="flex items-center justify-between border-b border-slate-300 pb-2">
+          <div className="flex items-center space-x-2 bg-slate-200/80 p-1 rounded-xl">
+            <button
+              type="button"
+              onClick={() => setActiveTab('visual')}
+              className={`inline-flex items-center space-x-2 px-4 py-2 rounded-lg text-xs font-bold transition-all ${
+                activeTab === 'visual'
+                  ? 'bg-indigo-600 text-white shadow-md'
+                  : 'text-slate-700 hover:text-slate-900 hover:bg-slate-300/60'
+              }`}
+            >
+              <Layout className="w-4 h-4" />
+              <span>Front Page Visual Editor Studio</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setActiveTab('form')}
+              className={`inline-flex items-center space-x-2 px-4 py-2 rounded-lg text-xs font-bold transition-all ${
+                activeTab === 'form'
+                  ? 'bg-indigo-600 text-white shadow-md'
+                  : 'text-slate-700 hover:text-slate-900 hover:bg-slate-300/60'
+              }`}
+            >
+              <FileText className="w-4 h-4" />
+              <span>Manuscript Upload & Batch Queue</span>
+            </button>
+          </div>
+
+          <div className="hidden sm:flex items-center space-x-2 text-xs font-medium text-slate-600 bg-white px-3 py-1.5 rounded-lg border border-slate-200 shadow-2xs">
+            <ShieldCheck className="w-4 h-4 text-emerald-600" />
+            <span>Interactive WYSIWYG & Print-Ready Typesetting</span>
+          </div>
         </div>
 
         {/* Typesetting Performance Metrics Dashboard */}
@@ -375,64 +494,82 @@ export default function App() {
           <ErrorAlert message={errorMessage} onDismiss={() => setErrorMessage(null)} />
         )}
 
-        {/* Main Content Area: Form & Results */}
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-          <motion.div
-            layout
-            className={showRightColumn ? 'lg:col-span-5' : 'lg:col-span-12 max-w-3xl mx-auto w-full'}
-          >
-            <MetadataForm
-              onSubmitSingle={handleSingleSubmit}
-              onSubmitBulk={handleBulkSubmit}
+        {/* Content View Based on Active Tab */}
+        {activeTab === 'visual' ? (
+          <div className="space-y-6">
+            <VisualFrontPageEditor
+              metadata={metadata}
+              onChangeMetadata={setMetadata}
+              onApplyAndGenerate={handleVisualEditorGenerate}
               isLoading={isLoading}
-              onLoadSample={handleLoadSample}
-              errorMessage={errorMessage || undefined}
-              onErrorDismiss={() => setErrorMessage(null)}
             />
-          </motion.div>
 
-          <AnimatePresence mode="wait">
-            {batchResult && (
-              <motion.div
-                key="batch-result-pane"
-                initial={{ opacity: 0, x: 20 }}
-                animate={{ opacity: 1, x: 0 }}
-                exit={{ opacity: 0, x: 20 }}
-                transition={{ duration: 0.3 }}
-                className={singleResult ? 'lg:col-span-7 space-y-4' : 'lg:col-span-7 sticky top-20'}
-              >
-                <BatchResultPane
-                  batchResult={batchResult}
-                  onClearBatch={handleReset}
-                  onSelectPreview={handleSelectBatchItemPreview}
-                  onRetryItem={handleRetryBatchItem}
-                />
-
-                {singleResult && (
-                  <div className="mt-4 pt-4 border-t border-slate-300">
-                    <PdfViewerPane
-                      result={singleResult}
-                      onReset={() => setSingleResult(null)}
-                    />
-                  </div>
-                )}
-              </motion.div>
+            {singleResult && (
+              <div className="mt-6">
+                <PdfViewerPane result={singleResult} onReset={() => setSingleResult(null)} />
+              </div>
             )}
+          </div>
+        ) : (
+          /* Main Content Area: Form & Results */
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+            <motion.div
+              layout
+              className={showRightColumn ? 'lg:col-span-5' : 'lg:col-span-12 max-w-3xl mx-auto w-full'}
+            >
+              <MetadataForm
+                onSubmitSingle={handleSingleSubmit}
+                onSubmitBulk={handleBulkSubmit}
+                isLoading={isLoading}
+                onLoadSample={handleLoadSample}
+                errorMessage={errorMessage || undefined}
+                onErrorDismiss={() => setErrorMessage(null)}
+              />
+            </motion.div>
 
-            {!batchResult && singleResult && (
-              <motion.div
-                key="single-preview-pane"
-                initial={{ opacity: 0, x: 20 }}
-                animate={{ opacity: 1, x: 0 }}
-                exit={{ opacity: 0, x: 20 }}
-                transition={{ duration: 0.3 }}
-                className="lg:col-span-7 sticky top-20"
-              >
-                <PdfViewerPane result={singleResult} onReset={handleReset} />
-              </motion.div>
-            )}
-          </AnimatePresence>
-        </div>
+            <AnimatePresence mode="wait">
+              {batchResult && (
+                <motion.div
+                  key="batch-result-pane"
+                  initial={{ opacity: 0, x: 20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  exit={{ opacity: 0, x: 20 }}
+                  transition={{ duration: 0.3 }}
+                  className={singleResult ? 'lg:col-span-7 space-y-4' : 'lg:col-span-7 sticky top-20'}
+                >
+                  <BatchResultPane
+                    batchResult={batchResult}
+                    onClearBatch={handleReset}
+                    onSelectPreview={handleSelectBatchItemPreview}
+                    onRetryItem={handleRetryBatchItem}
+                  />
+
+                  {singleResult && (
+                    <div className="mt-4 pt-4 border-t border-slate-300">
+                      <PdfViewerPane
+                        result={singleResult}
+                        onReset={() => setSingleResult(null)}
+                      />
+                    </div>
+                  )}
+                </motion.div>
+              )}
+
+              {!batchResult && singleResult && (
+                <motion.div
+                  key="single-preview-pane"
+                  initial={{ opacity: 0, x: 20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  exit={{ opacity: 0, x: 20 }}
+                  transition={{ duration: 0.3 }}
+                  className="lg:col-span-7 sticky top-20"
+                >
+                  <PdfViewerPane result={singleResult} onReset={handleReset} />
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
+        )}
       </main>
 
       {/* Footer */}

@@ -5,6 +5,7 @@ import { createServer as createViteServer } from 'vite';
 import { processDocxToPdf } from './server/docxProcessor.js';
 import { processPdfOverlay } from './server/pdfProcessor.js';
 import { createSampleDocxBuffer, createSamplePdfBuffer } from './server/sampleGenerator.js';
+import { parseManuscriptBuffer } from './server/manuscriptParser.js';
 import { GalleyMetadata, GalleyResponse } from './src/types.js';
 
 async function startServer() {
@@ -12,14 +13,15 @@ async function startServer() {
   const PORT = 3000;
 
   // Middleware for body parsing
-  app.use(express.json({ limit: '30mb' }));
-  app.use(express.urlencoded({ extended: true, limit: '30mb' }));
+  app.use(express.json({ limit: '50mb' }));
+  app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 
-  // Configure Multer memory storage (Max 25 MB)
+  // Configure Multer memory storage (Max 25 MB file, 50 MB field for base64 logo metadata)
   const upload = multer({
     storage: multer.memoryStorage(),
     limits: {
       fileSize: 25 * 1024 * 1024, // 25 MB
+      fieldSize: 50 * 1024 * 1024, // 50 MB
     },
     fileFilter: (_req, file, cb) => {
       const ext = path.extname(file.originalname).toLowerCase();
@@ -59,6 +61,32 @@ async function startServer() {
     }
   });
 
+  // API Route: Parse Manuscript Metadata (Auto-detect fields)
+  app.post('/api/parse-manuscript', (req, res, next) => {
+    upload.single('file')(req, res, (err) => {
+      if (err) return res.status(400).json({ error: err.message });
+      next();
+    });
+  }, async (req, res) => {
+    try {
+      let fileBuffer: Buffer;
+      let originalName = 'sample.docx';
+
+      if (req.body.useSampleType === 'docx' || !req.file) {
+        fileBuffer = await createSampleDocxBuffer();
+        originalName = 'sample-manuscript.docx';
+      } else {
+        fileBuffer = req.file.buffer;
+        originalName = req.file.originalname;
+      }
+
+      const parsedData = await parseManuscriptBuffer(fileBuffer, originalName);
+      res.json({ success: true, metadata: parsedData });
+    } catch (err: any) {
+      res.status(500).json({ error: 'Failed to parse manuscript: ' + err.message });
+    }
+  });
+
   // API Route: Generate Galley Proof PDF
   app.post('/api/generate-galley', (req, res, next) => {
     upload.single('file')(req, res, (err) => {
@@ -66,6 +94,11 @@ async function startServer() {
         if (err.code === 'LIMIT_FILE_SIZE') {
           return res.status(400).json({
             error: 'File size exceeds the 25 MB limit. Please upload a smaller manuscript.',
+          });
+        }
+        if (err.code === 'LIMIT_FIELD_VALUE') {
+          return res.status(400).json({
+            error: 'Form data or logo image size is too large.',
           });
         }
         if (err.message === 'INVALID_FILE_TYPE') {
@@ -116,6 +149,10 @@ async function startServer() {
       // Parse metadata from body
       const metadata: GalleyMetadata = {
         journalName: req.body.journalName || '',
+        subTitle: req.body.subTitle || '',
+        publisherName: req.body.publisherName || '',
+        runningHeader: req.body.runningHeader || '',
+        pageRange: req.body.pageRange || '',
         volume: req.body.volume || '',
         issue: req.body.issue || '',
         year: req.body.year || new Date().getFullYear().toString(),
@@ -125,6 +162,18 @@ async function startServer() {
         affiliation: req.body.affiliation || '',
         abstract: req.body.abstract || '',
         keywords: req.body.keywords || '',
+        orcid: req.body.orcid || '',
+        correspondingAuthor: req.body.correspondingAuthor || '',
+        leftLogoUrl: req.body.leftLogoUrl || '',
+        rightLogoUrl: req.body.rightLogoUrl || '',
+        receivedDate: req.body.receivedDate || '',
+        revisedDate: req.body.revisedDate || '',
+        acceptedDate: req.body.acceptedDate || '',
+        licenseType: req.body.licenseType || 'CC BY 4.0',
+        licenseText: req.body.licenseText || '',
+        showArticleInfo: req.body.showArticleInfo === 'true' || req.body.showArticleInfo === true || req.body.showArticleInfo === undefined,
+        layoutTemplate: (req.body.layoutTemplate as any) || 'fountain',
+        fontFamily: req.body.fontFamily || 'Georgia',
         addWatermark: req.body.addWatermark === 'true' || req.body.addWatermark === true,
         twoColumn: req.body.twoColumn === 'true' || req.body.twoColumn === true,
       };
@@ -169,6 +218,20 @@ async function startServer() {
         error: `Galley proof generation failed: ${err.message || 'An unexpected error occurred during processing.'}`,
       });
     }
+  });
+
+  // Catch-all 404 for API endpoints so they never fall through to SPA index.html
+  app.all('/api/*', (_req, res) => {
+    res.status(404).json({ error: 'API endpoint not found.' });
+  });
+
+  // Express JSON Error Handler for API routes
+  app.use((err: any, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
+    console.error('[API Server Error]', err);
+    const statusCode = err.status || err.statusCode || 500;
+    res.status(statusCode).json({
+      error: err.message || 'An error occurred on the galley engine server.',
+    });
   });
 
   // Vite middleware or production static serving

@@ -1,5 +1,9 @@
 export interface GalleyMetadata {
   journalName?: string;
+  subTitle?: string;
+  publisherName?: string;
+  runningHeader?: string;
+  pageRange?: string;
   volume?: string;
   issue?: string;
   year?: string;
@@ -9,8 +13,28 @@ export interface GalleyMetadata {
   affiliation?: string;
   abstract?: string;
   keywords?: string;
+  orcid?: string;
+  correspondingAuthor?: string;
+  leftLogoUrl?: string;
+  rightLogoUrl?: string;
+  receivedDate?: string;
+  revisedDate?: string;
+  acceptedDate?: string;
+  licenseType?: string;
+  licenseText?: string;
+  showArticleInfo?: boolean;
+  layoutTemplate?: 'fountain' | 'standard' | 'modern' | 'ieee';
+  fontFamily?: string;
   addWatermark?: boolean;
   twoColumn?: boolean;
+}
+
+export interface SavedTemplate {
+  id: string;
+  name: string;
+  updatedAt: string;
+  isDefault?: boolean;
+  metadata: GalleyMetadata;
 }
 
 export interface GalleyResponse {

@@ -56,6 +56,8 @@ export const MetadataForm: React.FC<MetadataFormProps> = ({
   const [affiliation, setAffiliation] = useState('');
   const [abstract, setAbstract] = useState('');
   const [keywords, setKeywords] = useState('');
+  const [orcid, setOrcid] = useState('0000-0002-1825-0097');
+  const [correspondingAuthor, setCorrespondingAuthor] = useState('ademola201052@yahoo.com');
   const [addWatermark, setAddWatermark] = useState(true);
   const [twoColumn, setTwoColumn] = useState(false);
   const [showAdvanced, setShowAdvanced] = useState(false);
@@ -172,6 +174,8 @@ export const MetadataForm: React.FC<MetadataFormProps> = ({
       setAffiliation('Department of Applied Physics, Bio-Quantum Laboratory, Zurich');
       setAbstract('Light-harvesting complexes demonstrate remarkable energy transfer efficiency exceeding 95%.');
       setKeywords('Quantum Coherence, Exciton Transfer');
+      setOrcid('0000-0002-1825-0097');
+      setCorrespondingAuthor('ademola201052@yahoo.com');
     } else {
       setJournalName('IEEE Transactions on Neural Computing');
       setVolume('42');
@@ -181,6 +185,8 @@ export const MetadataForm: React.FC<MetadataFormProps> = ({
       setTitle('Neural Signal Decoding via Deep Transformer Architectures');
       setAuthors('Prof. Marcus Vance & Dr. Sarah Jenkins');
       setAffiliation('Center for Neuro-Engineering, MIT');
+      setOrcid('0000-0001-9231-4012');
+      setCorrespondingAuthor('ademola201052@yahoo.com');
     }
 
     onLoadSample(sampleType);
@@ -249,6 +255,8 @@ export const MetadataForm: React.FC<MetadataFormProps> = ({
       affiliation,
       abstract,
       keywords,
+      orcid,
+      correspondingAuthor,
       addWatermark,
       twoColumn,
     };
@@ -283,6 +291,8 @@ export const MetadataForm: React.FC<MetadataFormProps> = ({
       formData.append('affiliation', affiliation);
       formData.append('abstract', abstract);
       formData.append('keywords', keywords);
+      formData.append('orcid', orcid);
+      formData.append('correspondingAuthor', correspondingAuthor);
       formData.append('addWatermark', addWatermark ? 'true' : 'false');
       formData.append('twoColumn', twoColumn ? 'true' : 'false');
 
@@ -695,6 +705,37 @@ export const MetadataForm: React.FC<MetadataFormProps> = ({
                 onChange={(e) => setAffiliation(e.target.value)}
                 placeholder="e.g. Oxford Institute of Ethics"
                 className="w-full text-sm border border-slate-200 rounded px-3 py-1.5 focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 outline-none text-slate-800 bg-white"
+              />
+            </div>
+
+            <div>
+              <div className="flex items-center justify-between mb-1">
+                <label className="text-[10px] font-medium text-slate-500 block">
+                  Author ORCID iD(s)
+                </label>
+                <span className="text-[9px] text-emerald-700 font-bold bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200">
+                  Auto-detected per author
+                </span>
+              </div>
+              <input
+                type="text"
+                value={orcid}
+                onChange={(e) => setOrcid(e.target.value)}
+                placeholder="e.g. 0000-0002-1825-0097"
+                className="w-full text-xs font-mono border border-slate-200 rounded px-3 py-1.5 focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 outline-none text-slate-800 bg-white"
+              />
+            </div>
+
+            <div>
+              <label className="text-[10px] font-medium text-slate-500 mb-1 block">
+                Corresponding Author Email
+              </label>
+              <input
+                type="text"
+                value={correspondingAuthor}
+                onChange={(e) => setCorrespondingAuthor(e.target.value)}
+                placeholder="ademola201052@yahoo.com"
+                className="w-full text-xs font-mono border border-slate-200 rounded px-3 py-1.5 focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 outline-none text-slate-800 bg-white"
               />
             </div>
           </div>

@@ -73,11 +73,15 @@ export async function processPdfOverlay(
       color: textColor,
     });
 
-    // Center zone: DOI
-    if (doiStr) {
-      const doiWidth = fontSans.widthOfTextAtSize(doiStr, footerFontSize);
-      page.drawText(doiStr, {
-        x: (width / 2) - (doiWidth / 2),
+    // Center zone: DOI & Corresponding Author
+    const corrEmail = metadata.correspondingAuthor?.trim() || 'ademola201052@yahoo.com';
+    const centerParts = [doiStr, `Corr. Author: ${corrEmail}`].filter(Boolean);
+    const centerText = centerParts.join(' | ');
+
+    if (centerText) {
+      const centerWidth = fontSans.widthOfTextAtSize(centerText, footerFontSize);
+      page.drawText(centerText, {
+        x: (width / 2) - (centerWidth / 2),
         y: footerY,
         size: footerFontSize,
         font: fontSans,
