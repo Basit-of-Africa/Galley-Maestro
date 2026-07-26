@@ -7,7 +7,7 @@
     "dev": "tsx server.ts",
     "build": "vite build && esbuild server.ts --bundle --platform=node --format=cjs --packages=external --sourcemap --outfile=dist/server.cjs",
     "start": "node dist/server.cjs",
-    "postinstall": "npx puppeteer browsers install chrome",
+    "postinstall": "PUPPETEER_CACHE_DIR=./.cache/puppeteer npx puppeteer browsers install chrome && chmod -R 777 ./.cache",
     "clean": "rm -rf dist server.js",
     "lint": "tsc --noEmit"
   },

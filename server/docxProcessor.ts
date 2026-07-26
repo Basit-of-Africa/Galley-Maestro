@@ -6,6 +6,8 @@ import path from 'path';
 import { execSync } from 'child_process';
 import { GalleyMetadata } from '../src/types.js';
 
+process.env.PUPPETEER_CACHE_DIR = path.join(process.cwd(), '.cache', 'puppeteer');
+
 function searchForChromeInDir(dir: string): string | undefined {
   try {
     if (!fs.existsSync(dir)) return undefined;
@@ -16,6 +18,11 @@ function searchForChromeInDir(dir: string): string | undefined {
         const result = searchForChromeInDir(fullPath);
         if (result) return result;
       } else if (entry.isFile() && (entry.name === 'chrome' || entry.name === 'chromium')) {
+        try {
+          fs.chmodSync(fullPath, 0o777);
+        } catch (e) {
+          // ignore
+        }
         return fullPath;
       }
     }
@@ -56,6 +63,7 @@ async function getChromeExecutablePath(): Promise<string | undefined> {
   }
 
   const cacheDirs = [
+    path.join(process.cwd(), '.cache', 'puppeteer'),
     '/root/.cache/puppeteer',
     '/www-data-home/.cache/puppeteer',
     path.join(process.env.HOME || '/root', '.cache', 'puppeteer'),

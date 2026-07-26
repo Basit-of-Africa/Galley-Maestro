@@ -1,6 +1,8 @@
 import express from 'express';
 import multer from 'multer';
 import path from 'path';
+
+process.env.PUPPETEER_CACHE_DIR = path.join(process.cwd(), '.cache', 'puppeteer');
 import { createServer as createViteServer } from 'vite';
 import { processDocxToPdf } from './server/docxProcessor.js';
 import { processPdfOverlay } from './server/pdfProcessor.js';
