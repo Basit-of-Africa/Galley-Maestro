@@ -3,7 +3,90 @@ import puppeteer from 'puppeteer';
 import { PDFDocument, rgb, degrees, StandardFonts } from 'pdf-lib';
 import fs from 'fs';
 import path from 'path';
+import { execSync } from 'child_process';
 import { GalleyMetadata } from '../src/types.js';
+
+function searchForChromeInDir(dir: string): string | undefined {
+  try {
+    if (!fs.existsSync(dir)) return undefined;
+    const entries = fs.readdirSync(dir, { withFileTypes: true });
+    for (const entry of entries) {
+      const fullPath = path.join(dir, entry.name);
+      if (entry.isDirectory()) {
+        const result = searchForChromeInDir(fullPath);
+        if (result) return result;
+      } else if (entry.isFile() && (entry.name === 'chrome' || entry.name === 'chromium')) {
+        return fullPath;
+      }
+    }
+  } catch (e) {
+    // ignore
+  }
+  return undefined;
+}
+
+async function getChromeExecutablePath(): Promise<string | undefined> {
+  if (process.env.PUPPETEER_EXECUTABLE_PATH && fs.existsSync(process.env.PUPPETEER_EXECUTABLE_PATH)) {
+    return process.env.PUPPETEER_EXECUTABLE_PATH;
+  }
+  if (process.env.CHROME_BIN && fs.existsSync(process.env.CHROME_BIN)) {
+    return process.env.CHROME_BIN;
+  }
+
+  // Check default puppeteer executable path
+  try {
+    const defaultPath = await puppeteer.executablePath();
+    if (defaultPath && fs.existsSync(defaultPath)) {
+      return defaultPath;
+    }
+  } catch (e) {
+    // ignore
+  }
+
+  const knownPaths = [
+    '/root/.cache/puppeteer/chrome/linux-150.0.7871.24/chrome-linux64/chrome',
+    '/usr/bin/google-chrome',
+    '/usr/bin/chromium',
+    '/usr/bin/chromium-browser',
+    '/usr/bin/google-chrome-stable',
+  ];
+
+  for (const p of knownPaths) {
+    if (fs.existsSync(p)) return p;
+  }
+
+  const cacheDirs = [
+    '/root/.cache/puppeteer',
+    '/www-data-home/.cache/puppeteer',
+    path.join(process.env.HOME || '/root', '.cache', 'puppeteer'),
+  ];
+
+  for (const cacheDir of cacheDirs) {
+    const found = searchForChromeInDir(cacheDir);
+    if (found) return found;
+  }
+
+  // Try installing via npx puppeteer browsers install chrome on the fly
+  try {
+    console.log('Attempting auto-install of Chrome browser for Puppeteer...');
+    execSync('npx puppeteer browsers install chrome', { stdio: 'inherit' });
+
+    // Check default path again
+    const newDefaultPath = await puppeteer.executablePath();
+    if (newDefaultPath && fs.existsSync(newDefaultPath)) {
+      return newDefaultPath;
+    }
+
+    for (const cacheDir of cacheDirs) {
+      const found = searchForChromeInDir(cacheDir);
+      if (found) return found;
+    }
+  } catch (err) {
+    console.error('Failed auto-installing Chrome for Puppeteer:', err);
+  }
+
+  return undefined;
+}
 
 function resolveLogoSrc(logoUrl?: string, defaultFileName: string = 'fountain_university_crest.jpg'): string {
   if (!logoUrl) return '';
@@ -643,9 +726,24 @@ export async function processDocxToPdf(
 </html>`;
 
   // 4. Render to PDF via Puppeteer
-  const browser = await puppeteer.launch({
-    args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage'],
-  });
+  const execPath = await getChromeExecutablePath();
+  const launchOptions: any = {
+    args: [
+      '--no-sandbox',
+      '--disable-setuid-sandbox',
+      '--disable-dev-shm-usage',
+      '--disable-gpu',
+      '--single-process',
+      '--no-zygote',
+    ],
+    headless: true,
+  };
+
+  if (execPath) {
+    launchOptions.executablePath = execPath;
+  }
+
+  const browser = await puppeteer.launch(launchOptions);
 
   try {
     const page = await browser.newPage();
