@@ -8,14 +8,15 @@ import { GalleyMetadata } from '../src/types.js';
 
 process.env.PUPPETEER_CACHE_DIR = path.join(process.cwd(), '.cache', 'puppeteer');
 
-function searchForChromeInDir(dir: string): string | undefined {
+function searchForChromeInDir(dir: string, depth = 0): string | undefined {
+  if (depth > 6) return undefined;
   try {
     if (!fs.existsSync(dir)) return undefined;
     const entries = fs.readdirSync(dir, { withFileTypes: true });
     for (const entry of entries) {
       const fullPath = path.join(dir, entry.name);
       if (entry.isDirectory()) {
-        const result = searchForChromeInDir(fullPath);
+        const result = searchForChromeInDir(fullPath, depth + 1);
         if (result) return result;
       } else if (entry.isFile() && (entry.name === 'chrome' || entry.name === 'chromium')) {
         try {
@@ -40,6 +41,26 @@ async function getChromeExecutablePath(): Promise<string | undefined> {
     return process.env.CHROME_BIN;
   }
 
+  const directPaths = [
+    path.join(process.cwd(), '.cache', 'puppeteer', 'chrome', 'linux-150.0.7871.24', 'chrome-linux64', 'chrome'),
+    '/www-data-home/.cache/puppeteer/chrome/linux-150.0.7871.24/chrome-linux64/chrome',
+    '/tmp/puppeteer-cache/chrome/linux-150.0.7871.24/chrome-linux64/chrome',
+    '/root/.cache/puppeteer/chrome/linux-150.0.7871.24/chrome-linux64/chrome',
+    '/usr/bin/google-chrome',
+    '/usr/bin/chromium',
+    '/usr/bin/chromium-browser',
+    '/usr/bin/google-chrome-stable',
+  ];
+
+  for (const p of directPaths) {
+    try {
+      if (fs.existsSync(p)) {
+        try { fs.chmodSync(p, 0o777); } catch (_) {}
+        return p;
+      }
+    } catch (_) {}
+  }
+
   // Check default puppeteer executable path
   try {
     const defaultPath = await puppeteer.executablePath();
@@ -50,26 +71,17 @@ async function getChromeExecutablePath(): Promise<string | undefined> {
     // ignore
   }
 
-  const knownPaths = [
-    '/root/.cache/puppeteer/chrome/linux-150.0.7871.24/chrome-linux64/chrome',
-    '/usr/bin/google-chrome',
-    '/usr/bin/chromium',
-    '/usr/bin/chromium-browser',
-    '/usr/bin/google-chrome-stable',
-  ];
-
-  for (const p of knownPaths) {
-    if (fs.existsSync(p)) return p;
-  }
-
   const cacheDirs = [
-    path.join(process.cwd(), '.cache', 'puppeteer'),
-    '/root/.cache/puppeteer',
-    '/www-data-home/.cache/puppeteer',
-    path.join(process.env.HOME || '/root', '.cache', 'puppeteer'),
+    path.join(process.cwd(), '.cache'),
+    '/www-data-home/.cache',
+    '/tmp/puppeteer-cache',
+    '/tmp',
+    path.join(process.env.HOME || '', '.cache'),
+    '/root/.cache',
   ];
 
   for (const cacheDir of cacheDirs) {
+    if (!cacheDir) continue;
     const found = searchForChromeInDir(cacheDir);
     if (found) return found;
   }
@@ -77,18 +89,14 @@ async function getChromeExecutablePath(): Promise<string | undefined> {
   // Try installing via npx puppeteer browsers install chrome on the fly
   try {
     console.log('Attempting auto-install of Chrome browser for Puppeteer...');
-    execSync('npx puppeteer browsers install chrome', { stdio: 'inherit' });
+    execSync('PUPPETEER_CACHE_DIR=./.cache/puppeteer npx puppeteer browsers install chrome', { stdio: 'inherit' });
 
-    // Check default path again
-    const newDefaultPath = await puppeteer.executablePath();
-    if (newDefaultPath && fs.existsSync(newDefaultPath)) {
-      return newDefaultPath;
+    for (const p of directPaths) {
+      if (fs.existsSync(p)) return p;
     }
 
-    for (const cacheDir of cacheDirs) {
-      const found = searchForChromeInDir(cacheDir);
-      if (found) return found;
-    }
+    const found = searchForChromeInDir(path.join(process.cwd(), '.cache'));
+    if (found) return found;
   } catch (err) {
     console.error('Failed auto-installing Chrome for Puppeteer:', err);
   }
