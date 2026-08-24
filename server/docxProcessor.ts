@@ -42,8 +42,8 @@ async function getChromeExecutablePath(): Promise<string | undefined> {
   }
 
   const directPaths = [
-    path.join(process.cwd(), '.cache', 'puppeteer', 'chrome', 'linux-150.0.7871.24', 'chrome-linux64', 'chrome'),
     '/www-data-home/.cache/puppeteer/chrome/linux-150.0.7871.24/chrome-linux64/chrome',
+    path.join(process.cwd(), '.cache', 'puppeteer', 'chrome', 'linux-150.0.7871.24', 'chrome-linux64', 'chrome'),
     '/tmp/puppeteer-cache/chrome/linux-150.0.7871.24/chrome-linux64/chrome',
     '/root/.cache/puppeteer/chrome/linux-150.0.7871.24/chrome-linux64/chrome',
     '/usr/bin/google-chrome',
@@ -72,8 +72,8 @@ async function getChromeExecutablePath(): Promise<string | undefined> {
   }
 
   const cacheDirs = [
-    path.join(process.cwd(), '.cache'),
     '/www-data-home/.cache',
+    path.join(process.cwd(), '.cache'),
     '/tmp/puppeteer-cache',
     '/tmp',
     path.join(process.env.HOME || '', '.cache'),
@@ -89,14 +89,16 @@ async function getChromeExecutablePath(): Promise<string | undefined> {
   // Try installing via npx puppeteer browsers install chrome on the fly
   try {
     console.log('Attempting auto-install of Chrome browser for Puppeteer...');
-    execSync('PUPPETEER_CACHE_DIR=./.cache/puppeteer npx puppeteer browsers install chrome', { stdio: 'inherit' });
+    execSync('npx puppeteer browsers install chrome', { stdio: 'inherit' });
 
     for (const p of directPaths) {
       if (fs.existsSync(p)) return p;
     }
 
-    const found = searchForChromeInDir(path.join(process.cwd(), '.cache'));
-    if (found) return found;
+    for (const cacheDir of cacheDirs) {
+      const found = searchForChromeInDir(cacheDir);
+      if (found) return found;
+    }
   } catch (err) {
     console.error('Failed auto-installing Chrome for Puppeteer:', err);
   }
@@ -759,7 +761,38 @@ export async function processDocxToPdf(
     launchOptions.executablePath = execPath;
   }
 
-  const browser = await puppeteer.launch(launchOptions);
+  let browser;
+  try {
+    browser = await puppeteer.launch(launchOptions);
+  } catch (launchErr) {
+    console.warn('Initial puppeteer launch failed, trying fallback paths...', launchErr);
+    const fallbackCandidates = [
+      '/www-data-home/.cache/puppeteer/chrome/linux-150.0.7871.24/chrome-linux64/chrome',
+      path.join(process.cwd(), '.cache', 'puppeteer', 'chrome', 'linux-150.0.7871.24', 'chrome-linux64', 'chrome'),
+      '/tmp/puppeteer-cache/chrome/linux-150.0.7871.24/chrome-linux64/chrome',
+      '/root/.cache/puppeteer/chrome/linux-150.0.7871.24/chrome-linux64/chrome',
+      '/usr/bin/google-chrome',
+      '/usr/bin/chromium',
+    ];
+    let launched = false;
+    for (const candidate of fallbackCandidates) {
+      if (fs.existsSync(candidate)) {
+        try {
+          browser = await puppeteer.launch({
+            ...launchOptions,
+            executablePath: candidate,
+          });
+          launched = true;
+          break;
+        } catch (e) {
+          console.warn(`Failed launching with candidate ${candidate}:`, e);
+        }
+      }
+    }
+    if (!launched || !browser) {
+      throw launchErr;
+    }
+  }
 
   try {
     const page = await browser.newPage();

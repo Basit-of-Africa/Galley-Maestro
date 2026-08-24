@@ -1,7 +1,23 @@
 import express from 'express';
 import multer from 'multer';
 import path from 'path';
+import fs from 'fs';
 
+const possibleChromePaths = [
+  path.join(process.cwd(), '.cache', 'puppeteer', 'chrome', 'linux-150.0.7871.24', 'chrome-linux64', 'chrome'),
+  '/www-data-home/.cache/puppeteer/chrome/linux-150.0.7871.24/chrome-linux64/chrome',
+  '/tmp/puppeteer-cache/chrome/linux-150.0.7871.24/chrome-linux64/chrome',
+  '/root/.cache/puppeteer/chrome/linux-150.0.7871.24/chrome-linux64/chrome',
+  '/usr/bin/google-chrome',
+  '/usr/bin/chromium',
+];
+
+for (const cp of possibleChromePaths) {
+  if (fs.existsSync(cp)) {
+    process.env.PUPPETEER_EXECUTABLE_PATH = cp;
+    break;
+  }
+}
 process.env.PUPPETEER_CACHE_DIR = path.join(process.cwd(), '.cache', 'puppeteer');
 import { createServer as createViteServer } from 'vite';
 import { processDocxToPdf } from './server/docxProcessor.js';
