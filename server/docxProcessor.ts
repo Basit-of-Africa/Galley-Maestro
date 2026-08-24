@@ -42,6 +42,10 @@ async function getChromeExecutablePath(): Promise<string | undefined> {
   }
 
   const directPaths = [
+    // Windows system Chrome
+    'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe',
+    'C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe',
+    // Linux paths
     '/www-data-home/.cache/puppeteer/chrome/linux-150.0.7871.24/chrome-linux64/chrome',
     path.join(process.cwd(), '.cache', 'puppeteer', 'chrome', 'linux-150.0.7871.24', 'chrome-linux64', 'chrome'),
     '/tmp/puppeteer-cache/chrome/linux-150.0.7871.24/chrome-linux64/chrome',
@@ -745,14 +749,14 @@ export async function processDocxToPdf(
 
   // 4. Render to PDF via Puppeteer
   const execPath = await getChromeExecutablePath();
+  const isWin = process.platform === 'win32';
   const launchOptions: any = {
     args: [
       '--no-sandbox',
       '--disable-setuid-sandbox',
       '--disable-dev-shm-usage',
       '--disable-gpu',
-      '--single-process',
-      '--no-zygote',
+      ...(isWin ? [] : ['--single-process', '--no-zygote']),
     ],
     headless: true,
   };
@@ -767,6 +771,10 @@ export async function processDocxToPdf(
   } catch (launchErr) {
     console.warn('Initial puppeteer launch failed, trying fallback paths...', launchErr);
     const fallbackCandidates = [
+      // Windows system Chrome
+      'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe',
+      'C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe',
+      // Linux paths
       '/www-data-home/.cache/puppeteer/chrome/linux-150.0.7871.24/chrome-linux64/chrome',
       path.join(process.cwd(), '.cache', 'puppeteer', 'chrome', 'linux-150.0.7871.24', 'chrome-linux64', 'chrome'),
       '/tmp/puppeteer-cache/chrome/linux-150.0.7871.24/chrome-linux64/chrome',
